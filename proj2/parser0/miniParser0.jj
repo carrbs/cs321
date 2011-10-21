@@ -1,0 +1,298 @@
+/* *************************** 
+ * Student: Benjamin Carr
+ * carrbs@cs.pdx.edu
+ *
+ * proj1 (miniLexer.jj)
+ *
+ * some of this code was designed by studying:
+ * Javacc-5.0/examples/JavaCCGrammar/JavaCC.jj
+ *
+ * ***************************/
+
+PARSER_BEGIN(miniLexer) 
+package lexer; 
+public class miniLexer {}
+PARSER_END(miniLexer)
+
+SKIP : /* WHITE SPACE */
+{
+  " "
+  | "\t"
+  | "\n"
+  | "\r"
+}
+
+MORE : /* Comments */
+{
+ "//" : IN_SINGLE_LINE_COMMENT
+| "/*" : IN_MULTI_LINE_COMMENT
+}
+
+<IN_SINGLE_LINE_COMMENT>
+SPECIAL_TOKEN :
+{
+ <SINGLE_LINE_COMMENT: "\n" | "\r" | "\r\n" > : DEFAULT
+}
+
+<IN_MULTI_LINE_COMMENT>
+SPECIAL_TOKEN :
+{
+ <MULTI_LINE_COMMENT: "*/" > : DEFAULT
+}
+
+<IN_SINGLE_LINE_COMMENT,IN_MULTI_LINE_COMMENT>
+MORE :
+{
+ < ~[] >
+}
+
+TOKEN : /* RESERVED WORDS AND LITERALS */
+{
+ < BOOLEAN: "boolean" >
+| < CLASS: "class" >
+| < ELSE: "else" >
+| < EXTENDS: "extends" >
+| < FALSE: "false" >
+| < FLOAT: "float" >
+| < IF: "if" >
+| < INT: "int" >
+| < LENGTH: "length" >
+| < MAIN: "main" >
+| < NEW: "new" >
+| < PUBLIC: "public" >
+| < RETURN: "return" >
+| < STATIC: "static" >
+| < THIS: "this" >
+| < TRUE: "true" >
+| < VOID: "void" >
+| < WHILE: "while" >
+| < STRING: "String" >
+| < PRINT_LINE: "System.out.println" >
+}
+
+TOKEN : /* Operators */
+{
+ < ASSIGNMENT: "=" >
+| < PLUS: "+" >
+| < MINUS: "-" >
+| < MULTIPLY: "*" >
+| < DIVIDE: "/" >
+| < AND: "&&"| >
+| < OR: "||" >
+| < NOT: "!" >
+| < EQUAL: "==" >
+| < NOT_EQUAL "!=" >
+| < LESS_THAN: "<" >
+| < GREATER_THAN: ">" >
+| < LESS_THAN_OR_EQUAL "<=" >
+| < GREATER_THAN_OR_EQUAL">=" >
+}
+
+TOKEN : /* Delimiters */
+{
+ < SEMICOLON: ";" >
+| < COMMA: "," >
+| < PERIOD: "." >
+| < LPAREN: "(" >
+| < RPAREN: ")" >
+| < LBRACKET: "[" >
+| < RBRACKET: "]" >
+| < LBRACE: "{" >
+| < RBRACE: "}" >
+}
+TOKEN : /* IDs and Numbers */
+{
+  < #DIGIT: ["0"-"9"] > 
+| < #LETTER: ["A"-"Z"] | ["a"-"z"] > 
+| < ID: <LETTER> (<LETTER> | <DIGIT>)* > 
+  {
+        if (matchedToken.image.length() > 255)
+            throw new TokenMgrError("Lexical error at line "
+            + matchedToken.beginLine + ", column " + matchedToken.beginColumn + ".  Id length over 255", 0);
+  }
+| <NUM: (<DIGIT>)+ >
+  {
+        if (Long.valueOf(matchedToken.image) > 2147483647)
+            throw new TokenMgrError("Lexical error at line "
+            + matchedToken.beginLine + ", column " + matchedToken.beginColumn + ".  Integer value over 2^31-1", 0);
+  }
+| < REAL: ((<DIGIT>)* "." (<DIGIT>)+) | ((<DIGIT>)+ "." (<DIGIT>)*) >
+| < REAL_FLOAT: (((<DIGIT>)* "." (<DIGIT>)+) ("f" | "F")) | (((<DIGIT>)+ "." (<DIGIT>)*) ("f" | "F")) >
+}
+ 
+TOKEN: /* String Literal */
+{
+ < STRING_LITERAL : "\"" ( ~["\r", "\n", "\""])* "\"" >
+ { 
+    if (matchedToken.image.length() > 257) 
+        throw new TokenMgrError("Lexical error at line "
+        + matchedToken.beginLine + ", column " + matchedToken.beginColumn + ". String length over 255", 0);
+ }
+}
+
+// Program    -> ClassDecl {ClassDecl}
+void Program()
+{
+    ClassDecl() ( ClassDecl() )*
+}
+
+// ClassDecl  -> "class" <ID> ["extends" <ID>] "{" {VarDecl} {MethodDecl} "}"
+void ClassDecl()
+{
+    <CLASS> <ID> [<EXTENDS> <ID>] <LBRACE> ( VarDecl() )* ( MethodDecl() )* <RBRACE>
+}
+// MethodDecl -> "public" Type <ID> "(" [Formals] ")" MethodBody
+//            |  "public" "void" <ID> "(" [Formals] ")" MethodBody
+//            |  "public" "static" "void" "main" "(" "String" "[" "]" <ID> ")"
+//                        MethodBody
+void MethodDecl()
+{
+    <PUBLIC> Type() <ID> <LPAREN> [Formals()] <RPAREN> MethodBody()
+|
+    <PUBLIC> <VOID> <ID> <LPAREN> [Formals()] <RPAREN> MethodBody()
+|
+    <PUBLIC> <STATIC> <VOID> <MAIN> <LPAREN> <STRING> <LBRACKET> <RBRACKET> <ID>
+        MethodBody()
+}
+
+
+// MethodBody -> "{" {VarDecl} {Statement} "}"
+void MethodBody()
+{
+    <LBRACE> ( VarDecl() )* ( Statement() )*
+}
+
+// Formals    -> Type <ID> {"," Type <ID>}
+void Formals()
+{
+    Type() <ID> ( <COMMA> Type() <ID> )*
+}
+
+// VarDecl    -> Type <ID> ["=" InitExpr] ";"
+void VarDecl()
+{
+    Type() <ID> [<ASSIGNMENT> InitExpr()] <SEMICOLON>
+}
+
+//Type       -> BasicType ["[" "]"] | <ID>
+void Type()
+{
+    BasicType() [<LBRACKET> <RBRACKET>] <ID>
+}
+
+// BasicType  -> "int" | "float" | "boolean"
+void BasicType()
+{
+    <INT>
+|
+    <FLOAT>
+|
+    <BOOLEAN>
+}
+
+// Statement  -> "{" {Statement} "}"
+//            |  Lvalue "=" InitExpr ";"
+//            |  Lvalue "(" [Args] ")" ";"
+//            |  "if" "(" Expr ")" Statement ["else" Statement]
+//            |  "while" "(" Expr ")" Statement
+//            |  "System.out.println" "(" [Expr | <STRVAL>] ")" ";"
+//            |  "return" [Expr] ";"
+void Statement()
+{
+    <LBRACE> Statement() <RBRACE>
+|
+    Lvalue() <ASSIGNMENT> InitExpr() <SEMICOLON>
+|
+    Lvalue() <LPAREN> [Args()] <RPAREN> <SEMICOLON>
+|
+    <IF> <LPAREN> Expr() <RPAREN> Statement() [<ELSE> Statement()]
+|
+    <WHILE> <LPAREN> Expr() <RPAREN> Statement()
+|
+    <PRINT_LINE> <LPAREN> [Expr() | <STRING_LITERAL>] <RPAREN> <SEMICOLON>
+|
+    <RETURN> [Expr()] <SEMICOLON>
+}
+
+//Args       -> Expr {"," Expr}
+void Args()
+{
+    Expr() ( <COMMA> Expr() )*
+}
+
+
+// InitExpr   -> "new" BasicType "[" <INTVAL> "]"
+//            |  "new" <ID> "(" [Args] ")"
+//            |  Expr
+void InitExpr()
+{
+    <NEW> BasicType() <LBRACKET> <NUM>
+|
+    <NEW> <ID> <LPAREN> [Args()] <RPAREN>
+|
+    Expr()
+}
+
+// Expr       -> Expr "||" AndExpr
+//            |  AndExpr
+void Expr()
+{
+    AndExpr() <OR> RelExpr()
+|
+    AndExpr()
+}
+
+// AndExpr    -> AndExpr "&&" RelExpr
+//            |  RelExpr
+void AndExpr()
+{
+    AndExpr() <AND> RelExpr()
+|
+    RelExpr()
+}
+
+// RelExpr    -> RelExpr Relop ArithExpr
+//            |  ArithExpr
+void RelExpr()
+{
+    RelExpr() Relop() ArithExpr()
+|
+    ArithExpr()
+}
+
+// ArithExpr  -> ArithExpr "+" Term
+//            |  ArithExpr "-" Term
+//            |  Term
+void ArithExpr()
+{
+    ArithExpr() <PLUS> Term()
+|
+    ArithExpr() <MINUS> Term()
+|
+    Term()
+}
+
+// Term       -> Term "*" Factor
+//            |  Term "/" Factor
+//            |  Factor
+void Term()
+{
+    Term() <MULTIPLY> Factor()
+|
+    Term() <DIVIDE> Factor()
+|
+    Factor()
+}
+
+// Factor     -> Unop Factor
+//            |  "(" Expr ")"
+//            |  Lvalue "(" [Args] ")"
+//            |  Lvalue "." "length" "(" ")"
+//            |  Lvalue
+//            |  Literal
+
+
+Lvalue     -> ["this" "."] <ID> {"." <ID>} ["[" Expr "]"]
+Literal    -> <INTVAL> | <FLOATVAL> | "true" | "false"
+Relop      -> "==" | "!=" | "<" | "<=" | ">" | ">="
+Unop       -> "-" | "!"

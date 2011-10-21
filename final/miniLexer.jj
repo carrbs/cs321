@@ -1,0 +1,111 @@
+/* *************************** 
+ * Student: Benjamin Carr
+ * carrbs@cs.pdx.edu
+ *
+ * proj1 (miniLexer.jj)
+ *
+ * some of this code was designed by studying:
+ * Javacc-5.0/examples/JavaCCGrammar/JavaCC.jj
+ *
+ * ***************************/
+
+PARSER_BEGIN(miniLexer) 
+package lexer; 
+public class miniLexer {}
+PARSER_END(miniLexer)
+
+SKIP : /* WHITE SPACE */
+{
+  " "
+  | "\t"
+  | "\n"
+  | "\r"
+}
+
+MORE : /* Comments */
+{
+ "//" : IN_SINGLE_LINE_COMMENT
+| "/*" : IN_MULTI_LINE_COMMENT
+}
+
+<IN_SINGLE_LINE_COMMENT>
+SPECIAL_TOKEN :
+{
+ <SINGLE_LINE_COMMENT: "\n" | "\r" | "\r\n" > : DEFAULT
+}
+
+<IN_MULTI_LINE_COMMENT>
+SPECIAL_TOKEN :
+{
+ <MULTI_LINE_COMMENT: "*/" > : DEFAULT
+}
+
+<IN_SINGLE_LINE_COMMENT,IN_MULTI_LINE_COMMENT>
+MORE :
+{
+ < ~[] >
+}
+
+TOKEN : /* RESERVED WORDS AND LITERALS */
+{
+ < BOOLEAN: "boolean" >
+| < CLASS: "class" >
+| < ELSE: "else" >
+| < EXTENDS: "extends" >
+| < FALSE: "false" >
+| < FLOAT: "float" >
+| < IF: "if" >
+| < INT: "int" >
+| < LENGTH: "length" >
+| < MAIN: "main" >
+| < NEW: "new" >
+| < PUBLIC: "public" >
+| < RETURN: "return" >
+| < STATIC: "static" >
+| < THIS: "this" >
+| < TRUE: "true" >
+| < VOID: "void" >
+| < WHILE: "while" >
+| < STRING: "String" >
+| < PRINT_LINE: "System.out.println" >
+}
+
+TOKEN : /* Operators */
+{
+ < OPERATOR : "="|"+"|"-"|"*"|"/"|"&&"|"||"|"!"|"=="|"!="|"<"|"<="|">"|">=" >
+}
+
+TOKEN : /* Delimiters */
+{
+ < DELIMITER: ";"|","|"."|"("|")"|"["|"]"|"{"|"}" >
+}
+TOKEN : /* IDs and Numbers */
+{
+ < KEYWORD : "begin" | "end" >
+| < #DIGIT: ["0"-"9"] > 
+| < #LETTER: ["A"-"Z"] | ["a"-"z"] > 
+| < ID: <LETTER> (<LETTER> | <DIGIT>)* > 
+  {
+        if (matchedToken.image.length() > 255)
+            throw new TokenMgrError("Lexical error at line "
+            + matchedToken.beginLine + ", column " + matchedToken.beginColumn + ".  Id length over 255", 0);
+  }
+| <NUM: (<DIGIT>)+ >
+  {
+        if (Long.valueOf(matchedToken.image) > 2147483647)
+            throw new TokenMgrError("Lexical error at line "
+            + matchedToken.beginLine + ", column " + matchedToken.beginColumn + ".  Integer value over 2^31-1", 0);
+  }
+| < REAL: ((<DIGIT>)* "." (<DIGIT>)+) | ((<DIGIT>)+ "." (<DIGIT>)*) >
+| < REAL_FLOAT: (((<DIGIT>)* "." (<DIGIT>)+) ("f" | "F")) | (((<DIGIT>)+ "." (<DIGIT>)*) ("f" | "F")) >
+}
+ 
+TOKEN: /* String Literal */
+{
+ < STRING_LITERAL : "\"" ( ~["\r", "\n", "\""])* "\"" >
+ { 
+    if (matchedToken.image.length() > 257) 
+        throw new TokenMgrError("Lexical error at line "
+        + matchedToken.beginLine + ", column " + matchedToken.beginColumn + ". String length over 255", 0);
+ }
+}
