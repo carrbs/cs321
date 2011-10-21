@@ -131,13 +131,15 @@ TOKEN: /* String Literal */
 }
 
 // Program    -> ClassDecl {ClassDecl}
-void Program()
+void Program() :
+{}
 {
     ClassDecl() ( ClassDecl() )*
 }
 
 // ClassDecl  -> "class" <ID> ["extends" <ID>] "{" {VarDecl} {MethodDecl} "}"
-void ClassDecl()
+void ClassDecl() :
+{}
 {
     <CLASS> <ID> [<EXTENDS> <ID>] <LBRACE> ( VarDecl() )* ( MethodDecl() )* <RBRACE>
 }
@@ -145,7 +147,8 @@ void ClassDecl()
 //            |  "public" "void" <ID> "(" [Formals] ")" MethodBody
 //            |  "public" "static" "void" "main" "(" "String" "[" "]" <ID> ")"
 //                        MethodBody
-void MethodDecl()
+void MethodDecl() :
+{}
 {
     <PUBLIC> Type() <ID> <LPAREN> [Formals()] <RPAREN> MethodBody()
 |
@@ -157,31 +160,36 @@ void MethodDecl()
 
 
 // MethodBody -> "{" {VarDecl} {Statement} "}"
-void MethodBody()
+void MethodBody() :
+{}
 {
     <LBRACE> ( VarDecl() )* ( Statement() )*
 }
 
 // Formals    -> Type <ID> {"," Type <ID>}
-void Formals()
+void Formals() : 
+{}
 {
     Type() <ID> ( <COMMA> Type() <ID> )*
 }
 
 // VarDecl    -> Type <ID> ["=" InitExpr] ";"
-void VarDecl()
+void VarDecl() : 
+{}
 {
     Type() <ID> [<ASSIGNMENT> InitExpr()] <SEMICOLON>
 }
 
 //Type       -> BasicType ["[" "]"] | <ID>
-void Type()
+void Type() :
+{}
 {
     BasicType() [<LBRACKET> <RBRACKET>] <ID>
 }
 
 // BasicType  -> "int" | "float" | "boolean"
-void BasicType()
+void BasicType() :
+{}
 {
     <INT>
 |
@@ -197,7 +205,8 @@ void BasicType()
 //            |  "while" "(" Expr ")" Statement
 //            |  "System.out.println" "(" [Expr | <STRVAL>] ")" ";"
 //            |  "return" [Expr] ";"
-void Statement()
+void Statement() :
+{}
 {
     <LBRACE> Statement() <RBRACE>
 |
@@ -215,7 +224,8 @@ void Statement()
 }
 
 //Args       -> Expr {"," Expr}
-void Args()
+void Args() :
+{}
 {
     Expr() ( <COMMA> Expr() )*
 }
@@ -224,7 +234,8 @@ void Args()
 // InitExpr   -> "new" BasicType "[" <INTVAL> "]"
 //            |  "new" <ID> "(" [Args] ")"
 //            |  Expr
-void InitExpr()
+void InitExpr() :
+{}
 {
     <NEW> BasicType() <LBRACKET> <NUM>
 |
@@ -235,7 +246,8 @@ void InitExpr()
 
 // Expr       -> Expr "||" AndExpr
 //            |  AndExpr
-void Expr()
+void Expr() :
+{}
 {
     AndExpr() <OR> RelExpr()
 |
@@ -244,7 +256,8 @@ void Expr()
 
 // AndExpr    -> AndExpr "&&" RelExpr
 //            |  RelExpr
-void AndExpr()
+void AndExpr() :
+{}
 {
     AndExpr() <AND> RelExpr()
 |
@@ -253,7 +266,8 @@ void AndExpr()
 
 // RelExpr    -> RelExpr Relop ArithExpr
 //            |  ArithExpr
-void RelExpr()
+void RelExpr() :
+{}
 {
     RelExpr() Relop() ArithExpr()
 |
@@ -263,7 +277,8 @@ void RelExpr()
 // ArithExpr  -> ArithExpr "+" Term
 //            |  ArithExpr "-" Term
 //            |  Term
-void ArithExpr()
+void ArithExpr() :
+{}
 {
     ArithExpr() <PLUS> Term()
 |
@@ -275,7 +290,8 @@ void ArithExpr()
 // Term       -> Term "*" Factor
 //            |  Term "/" Factor
 //            |  Factor
-void Term()
+void Term() :
+{}
 {
     Term() <MULTIPLY> Factor()
 |
@@ -290,14 +306,63 @@ void Term()
 //            |  Lvalue "." "length" "(" ")"
 //            |  Lvalue
 //            |  Literal
-void Factor()
+void Factor() :
+{}
 {
     <LPAREN> Expr() <RPAREN>
 |
-    Lvalue() <LPAREN> [Args] <RPAREN>
+    Lvalue() <LPAREN> [Args()] <RPAREN>
 |    
+    Lvalue() <PERIOD> [ Args() ] <LPAREN> <RPAREN>
+|
+    Lvalue()
+|
+    Literal()
+}
 
-Lvalue     -> ["this" "."] <ID> {"." <ID>} ["[" Expr "]"]
-Literal    -> <INTVAL> | <FLOATVAL> | "true" | "false"
-Relop      -> "==" | "!=" | "<" | "<=" | ">" | ">="
-Unop       -> "-" | "!"
+// Lvalue     -> ["this" "."] <ID> {"." <ID>} ["[" Expr "]"]
+Lvalue() :
+{}
+{
+    [ <THIS> <PERIOD> ] <ID> ( <PERIOD> <ID> )* [ <LBRACKET> Expr() <RBRACKET> ]
+}
+
+// Literal    -> <INTVAL> | <FLOATVAL> | "true" | "false"
+void Literal() :
+{}
+{
+    <NUM>
+|
+    <REAL>
+|
+    <TRUE>
+|
+    <FALSE>
+}    
+
+// Relop    -> "==" | "!=" | "<" | "<=" | ">" | ">="
+void Relop() :
+{}
+{
+    <EQUAL>
+|
+    <NOT_EQUAL>
+|
+    <LESS_THAN>
+|
+    <LESS_THAN_OR_EQUAL>
+|
+    <GREATER_THAN>
+|
+    <GREATER_THAN+_OR_EQUAL>
+}
+
+
+// Unop       -> "-" | "!"
+void Unop() :
+{}
+{
+    <MINUS>
+|
+    <NOT>
+}
