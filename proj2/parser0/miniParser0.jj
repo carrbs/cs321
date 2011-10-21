@@ -77,15 +77,15 @@ TOKEN : /* Operators */
 | < MINUS: "-" >
 | < MULTIPLY: "*" >
 | < DIVIDE: "/" >
-| < AND: "&&"| >
+| < AND: "&&" >
 | < OR: "||" >
 | < NOT: "!" >
 | < EQUAL: "==" >
-| < NOT_EQUAL "!=" >
+| < NOT_EQUAL: "!=" >
 | < LESS_THAN: "<" >
 | < GREATER_THAN: ">" >
-| < LESS_THAN_OR_EQUAL "<=" >
-| < GREATER_THAN_OR_EQUAL">=" >
+| < LESS_THAN_OR_EQUAL: "<=" >
+| < GREATER_THAN_OR_EQUAL: ">=" >
 }
 
 TOKEN : /* Delimiters */
@@ -244,62 +244,93 @@ void InitExpr() :
     Expr()
 }
 
-// Expr       -> Expr "||" AndExpr
-//            |  AndExpr
+// Expr         -> AndExpr OrTail
 void Expr() :
 {}
 {
-    AndExpr() <OR> RelExpr()
-|
-    AndExpr()
+    AndExpr() OrTail()
 }
 
-// AndExpr    -> AndExpr "&&" RelExpr
-//            |  RelExpr
+// OrTail       -> [ "||"  AndExpr OrTail ]
+void OrTail() :
+{}
+{
+    [ <OR> AndExpr() OrTail() ]
+}
+
+// AndExpr    -> RelExpr AndTail
 void AndExpr() :
 {}
 {
-    AndExpr() <AND> RelExpr()
-|
-    RelExpr()
+    RelExpr() AndTail()
 }
+
+// AndTail()    -> [ "&&" RelExpr AndTail ]
+void AndTail() :
+{}
+{
+    [ <AND> RelExpr() AndTail() ]
+}
+
 
 // RelExpr    -> RelExpr Relop ArithExpr
 //            |  ArithExpr
+
+// RelExpr      -> ArithExpr RelTail
 void RelExpr() :
 {}
 {
-    RelExpr() Relop() ArithExpr()
-|
-    ArithExpr()
+    ArithExpr() RelTail()
 }
+
+// RelTail      -> Relop RelExpr ArithExpr
+void RelTail() :
+{}
+{
+    Relop() RelExpr() ArithExpr()
+}
+
 
 // ArithExpr  -> ArithExpr "+" Term
 //            |  ArithExpr "-" Term
 //            |  Term
+
+// ArithExpr -> Term ArithTail
 void ArithExpr() :
 {}
 {
-    ArithExpr() <PLUS> Term()
-|
-    ArithExpr() <MINUS> Term()
-|
-    Term()
+    Term() ArithTail()
 }
 
+// ArithTail    -> "+" Term ArithTail | "-" Term ArithTail
+void ArithTail() :
+{}
+{
+    <PLUS> Term() ArithTail()
+|
+    <MINUS> Term() ArithTail()
+}
+    
 // Term       -> Term "*" Factor
 //            |  Term "/" Factor
 //            |  Factor
+
+// Term         -> Factor TermTail
 void Term() :
 {}
 {
-    Term() <MULTIPLY> Factor()
-|
-    Term() <DIVIDE> Factor()
-|
-    Factor()
+    Factor() TermTail()
 }
 
+// TermTail      -> "*" Factor TermTail
+//              | "/" Factor TermTail
+void TermTail() :
+{}
+{
+    <MULTIPLY> Factor() TermTail()
+    <DIVIDE> Factor() TermTail()
+}
+    
 // Factor     -> Unop Factor
 //            |  "(" Expr ")"
 //            |  Lvalue "(" [Args] ")"
@@ -321,7 +352,7 @@ void Factor() :
 }
 
 // Lvalue     -> ["this" "."] <ID> {"." <ID>} ["[" Expr "]"]
-Lvalue() :
+void Lvalue() :
 {}
 {
     [ <THIS> <PERIOD> ] <ID> ( <PERIOD> <ID> )* [ <LBRACKET> Expr() <RBRACKET> ]
@@ -354,7 +385,7 @@ void Relop() :
 |
     <GREATER_THAN>
 |
-    <GREATER_THAN+_OR_EQUAL>
+    <GREATER_THAN_OR_EQUAL>
 }
 
 
