@@ -290,7 +290,12 @@ void Term()
 //            |  Lvalue "." "length" "(" ")"
 //            |  Lvalue
 //            |  Literal
-
+void Factor()
+{
+    <LPAREN> Expr() <RPAREN>
+|
+    Lvalue() <LPAREN> [Args] <RPAREN>
+|    
 
 Lvalue     -> ["this" "."] <ID> {"." <ID>} ["[" Expr "]"]
 Literal    -> <INTVAL> | <FLOATVAL> | "true" | "false"
