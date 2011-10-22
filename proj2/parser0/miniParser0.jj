@@ -9,10 +9,10 @@
  *
  * ***************************/
 
-PARSER_BEGIN(miniLexer) 
-package lexer; 
-public class miniLexer {}
-PARSER_END(miniLexer)
+PARSER_BEGIN(miniParser0) 
+package parser0; 
+public class miniParser0 {}
+PARSER_END(miniParser0)
 
 SKIP : /* WHITE SPACE */
 {
@@ -110,14 +110,13 @@ TOKEN : /* IDs and Numbers */
             throw new TokenMgrError("Lexical error at line "
             + matchedToken.beginLine + ", column " + matchedToken.beginColumn + ".  Id length over 255", 0);
   }
-| <NUM: (<DIGIT>)+ >
+| < NUM: (<DIGIT>)+ >
   {
         if (Long.valueOf(matchedToken.image) > 2147483647)
             throw new TokenMgrError("Lexical error at line "
             + matchedToken.beginLine + ", column " + matchedToken.beginColumn + ".  Integer value over 2^31-1", 0);
   }
-| < REAL: ((<DIGIT>)* "." (<DIGIT>)+) | ((<DIGIT>)+ "." (<DIGIT>)*) >
-| < REAL_FLOAT: (((<DIGIT>)* "." (<DIGIT>)+) ("f" | "F")) | (((<DIGIT>)+ "." (<DIGIT>)*) ("f" | "F")) >
+| < REAL: (((<DIGIT>)* "." (<DIGIT>)+) ("f" | "F")) | (((<DIGIT>)+ "." (<DIGIT>)*) ("f" | "F")) >
 }
  
 TOKEN: /* String Literal */
@@ -141,20 +140,28 @@ void Program() :
 void ClassDecl() :
 {}
 {
-    <CLASS> <ID> [<EXTENDS> <ID>] <LBRACE> ( VarDecl() )* ( MethodDecl() )* <RBRACE>
+    <CLASS> <ID> [<EXTENDS> <ID>] <LBRACE> ( VarDecl() )* ( PublicMethodDecl() )* <RBRACE>
 }
-// MethodDecl -> "public" Type <ID> "(" [Formals] ")" MethodBody
-//            |  "public" "void" <ID> "(" [Formals] ")" MethodBody
-//            |  "public" "static" "void" "main" "(" "String" "[" "]" <ID> ")"
+
+// PublicMethodDecl -> "public" MethodDecl
+void PublicMethodDecl() :
+{}
+{
+    <PUBLIC> MethodDecl()
+}
+
+// MethodDecl -> Type <ID> "(" [Formals] ")" MethodBody
+//            |  "void" <ID> "(" [Formals] ")" MethodBody
+//            |  "static" "void" "main" "(" "String" "[" "]" <ID> ")"
 //                        MethodBody
 void MethodDecl() :
 {}
 {
-    <PUBLIC> Type() <ID> <LPAREN> [Formals()] <RPAREN> MethodBody()
+    Type() <ID> <LPAREN> [Formals()] <RPAREN> MethodBody()
 |
-    <PUBLIC> <VOID> <ID> <LPAREN> [Formals()] <RPAREN> MethodBody()
+    <VOID> <ID> <LPAREN> [Formals()] <RPAREN> MethodBody()
 |
-    <PUBLIC> <STATIC> <VOID> <MAIN> <LPAREN> <STRING> <LBRACKET> <RBRACKET> <ID>
+    <STATIC> <VOID> <MAIN> <LPAREN> <STRING> <LBRACKET> <RBRACKET> <ID> <RPAREN>
         MethodBody()
 }
 
@@ -163,7 +170,7 @@ void MethodDecl() :
 void MethodBody() :
 {}
 {
-    <LBRACE> ( VarDecl() )* ( Statement() )*
+    <LBRACE> ( LOOKAHEAD(2) VarDecl() )* ( Statement() )* <RBRACE>
 }
 
 // Formals    -> Type <ID> {"," Type <ID>}
@@ -177,14 +184,16 @@ void Formals() :
 void VarDecl() : 
 {}
 {
-    Type() <ID> [<ASSIGNMENT> InitExpr()] <SEMICOLON>
+    Type() <ID> [ <ASSIGNMENT> InitExpr() ] <SEMICOLON>
 }
 
 //Type       -> BasicType ["[" "]"] | <ID>
 void Type() :
 {}
 {
-    BasicType() [<LBRACKET> <RBRACKET>] <ID>
+    BasicType() [<LBRACKET> <RBRACKET>] 
+|
+    <ID>
 }
 
 // BasicType  -> "int" | "float" | "boolean"
@@ -199,8 +208,7 @@ void BasicType() :
 }
 
 // Statement  -> "{" {Statement} "}"
-//            |  Lvalue "=" InitExpr ";"
-//            |  Lvalue "(" [Args] ")" ";"
+//            |  Lvalue LvalueStatement
 //            |  "if" "(" Expr ")" Statement ["else" Statement]
 //            |  "while" "(" Expr ")" Statement
 //            |  "System.out.println" "(" [Expr | <STRVAL>] ")" ";"
@@ -208,19 +216,27 @@ void BasicType() :
 void Statement() :
 {}
 {
-    <LBRACE> Statement() <RBRACE>
+    <LBRACE> ( Statement() )* <RBRACE>
 |
-    Lvalue() <ASSIGNMENT> InitExpr() <SEMICOLON>
+    Lvalue() LvalueStatement()
 |
-    Lvalue() <LPAREN> [Args()] <RPAREN> <SEMICOLON>
-|
-    <IF> <LPAREN> Expr() <RPAREN> Statement() [<ELSE> Statement()]
+    <IF> <LPAREN> Expr() <RPAREN> Statement() [LOOKAHEAD(1) <ELSE> Statement()]
 |
     <WHILE> <LPAREN> Expr() <RPAREN> Statement()
 |
     <PRINT_LINE> <LPAREN> [Expr() | <STRING_LITERAL>] <RPAREN> <SEMICOLON>
 |
     <RETURN> [Expr()] <SEMICOLON>
+}
+
+// LvalueStatement      -> "=" InitExpr ";"
+//                      |  "(" [Args] ")" ";"
+void LvalueStatement() :
+{}
+{
+    <ASSIGNMENT> InitExpr() <SEMICOLON>
+|
+    <LPAREN> [Args()] <RPAREN> <SEMICOLON>
 }
 
 //Args       -> Expr {"," Expr}
@@ -231,56 +247,63 @@ void Args() :
 }
 
 
-// InitExpr   -> "new" BasicType "[" <INTVAL> "]"
-//            |  "new" <ID> "(" [Args] ")"
+// InitExpr   -> "new" NewIntExpr
 //            |  Expr
 void InitExpr() :
 {}
 {
-    <NEW> BasicType() <LBRACKET> <NUM>
-|
-    <NEW> <ID> <LPAREN> [Args()] <RPAREN>
+    <NEW> NewInitExpr()
 |
     Expr()
 }
 
-// Expr         -> AndExpr OrTail
+
+// NewInitExpr  -> BasicType "[" <INTVAL> "]"
+//              |  <ID> "(" [Args] ")"
+void NewInitExpr() :
+{}
+{
+    BasicType() <LBRACKET> <NUM> <RBRACKET>
+|
+    <ID> <LPAREN> [Args()] <RPAREN>
+}
+// Expr         -> { AndExpr OrTail }
 void Expr() :
 {}
 {
-    AndExpr() OrTail()
+    ( AndExpr() OrTail() )*
 }
 
-// OrTail       -> [ "||"  AndExpr OrTail ]
+// OrTail       -> { "||"  AndExpr OrTail }
 void OrTail() :
 {}
 {
-    [ <OR> AndExpr() OrTail() ]
+    ( <OR> AndExpr() OrTail() )*
 }
 
 // AndExpr    -> RelExpr AndTail
 void AndExpr() :
 {}
 {
-    RelExpr() AndTail()
+    ( RelExpr() AndTail() )*
 }
 
-// AndTail()    -> [ "&&" RelExpr AndTail ]
+// AndTail()    -> { "&&" RelExpr AndTail }
 void AndTail() :
 {}
 {
-    [ <AND> RelExpr() AndTail() ]
+    ( <AND> RelExpr() AndTail() ) *
 }
 
 
 // RelExpr    -> RelExpr Relop ArithExpr
 //            |  ArithExpr
 
-// RelExpr      -> ArithExpr RelTail
+// RelExpr      -> { ArithExpr RelTail }
 void RelExpr() :
 {}
 {
-    ArithExpr() RelTail()
+    ( ArithExpr() RelTail() )*
 }
 
 // RelTail      -> Relop RelExpr ArithExpr
@@ -333,29 +356,35 @@ void TermTail() :
     
 // Factor     -> Unop Factor
 //            |  "(" Expr ")"
-//            |  Lvalue "(" [Args] ")"
-//            |  Lvalue "." "length" "(" ")"
-//            |  Lvalue
+//            |  Lvalue [ LvalueFactor ]
 //            |  Literal
 void Factor() :
 {}
 {
+    Unop() Factor()
+|
     <LPAREN> Expr() <RPAREN>
 |
-    Lvalue() <LPAREN> [Args()] <RPAREN>
-|    
-    Lvalue() <PERIOD> [ Args() ] <LPAREN> <RPAREN>
-|
-    Lvalue()
+    Lvalue() [ LvalueFactor() ]
 |
     Literal()
+}
+
+//  LvalueFactor    -> "(" [Args] ")"
+//                  |  "." "length" "(" ")"
+void LvalueFactor() :
+{}
+{
+    <LPAREN> [ Args() ] <RPAREN>
+|
+    <PERIOD> <LENGTH> <LPAREN> <RPAREN>
 }
 
 // Lvalue     -> ["this" "."] <ID> {"." <ID>} ["[" Expr "]"]
 void Lvalue() :
 {}
 {
-    [ <THIS> <PERIOD> ] <ID> ( <PERIOD> <ID> )* [ <LBRACKET> Expr() <RBRACKET> ]
+    [ <THIS> <PERIOD> ] <ID> ( LOOKAHEAD(2) <PERIOD> <ID> )* [ <LBRACKET> Expr() <RBRACKET> ]
 }
 
 // Literal    -> <INTVAL> | <FLOATVAL> | "true" | "false"

@@ -84,6 +84,9 @@ clean_ast:
 clean_lexer:
 	$(RM) lexer/*.class lexer/miniLexer.java
 
+clean_parser0:
+	$(RM) parser0/*.class parser0/miniParser0.java
+
 clean_parser:
 	$(RM) parser/*.class parser/miniParser.java
 
