@@ -59,45 +59,16 @@ TOKEN : /* RESERVED WORDS AND LITERALS */
 | < NEW: "new" >
 | < PUBLIC: "public" >
 | < RETURN: "return" >
+| < PRINT_LINE: "System.out.println" >
 | < STATIC: "static" >
 | < THIS: "this" >
 | < TRUE: "true" >
 | < VOID: "void" >
 | < WHILE: "while" >
 | < STRING: "String" >
-| < PRINT_LINE: "System.out.println" >
 }
 
-TOKEN : /* Operators */
-{
- < ASSIGNMENT: "=" >
-| < PLUS: "+" >
-| < MINUS: "-" >
-| < MULTIPLY: "*" >
-| < DIVIDE: "/" >
-| < AND: "&&" >
-| < OR: "||" >
-| < NOT: "!" >
-| < EQUAL: "==" >
-| < NOT_EQUAL: "!=" >
-| < LESS_THAN: "<" >
-| < GREATER_THAN: ">" >
-| < LESS_THAN_OR_EQUAL: "<=" >
-| < GREATER_THAN_OR_EQUAL: ">=" >
-}
 
-TOKEN : /* Delimiters */
-{
- < SEMICOLON: ";" >
-| < COMMA: "," >
-| < PERIOD: "." >
-| < LPAREN: "(" >
-| < RPAREN: ")" >
-| < LBRACKET: "[" >
-| < RBRACKET: "]" >
-| < LBRACE: "{" >
-| < RBRACE: "}" >
-}
 TOKEN : /* IDs and Numbers */
 {
   < #DIGIT: ["0"-"9"] > 
@@ -108,7 +79,7 @@ TOKEN : /* IDs and Numbers */
             throw new TokenMgrError("Lexical error at line "
             + matchedToken.beginLine + ", column " + matchedToken.beginColumn + ".  Id length over 255", 0);
   }
-| < NUM: (<DIGIT>)+ >
+| < INTVAL: (<DIGIT>)+ >
   {
         if (Long.valueOf(matchedToken.image) > 2147483647)
             throw new TokenMgrError("Lexical error at line "
@@ -116,7 +87,33 @@ TOKEN : /* IDs and Numbers */
   }
 | < REAL: (((<DIGIT>)* "." (<DIGIT>)+) ("f" | "F")) | (((<DIGIT>)+ "." (<DIGIT>)*) ("f" | "F")) >
 }
- 
+
+TOKEN : /* Delimiters / Operators */ 
+{
+ < LPAREN: "(" >
+| < RPAREN: ")" >
+| < LBRACKET: "[" >
+| < RBRACKET: "]" >
+| < LBRACE: "{" >
+| < RBRACE: "}" >
+| < COMMA: "," >
+| < ASSIGNMENT: "=" >
+| < SEMICOLON: ";" >
+| < OR: "||" >
+| < AND: "&&" >
+| < PLUS: "+" >
+| < MINUS: "-" >
+| < MULTIPLY: "*" >
+| < DIVIDE: "/" >
+| < PERIOD: "." >
+| < NOT: "!" >
+| < EQUAL: "==" >
+| < NOT_EQUAL: "!=" >
+| < LESS_THAN: "<" >
+| < LESS_THAN_OR_EQUAL: "<=" >
+| < GREATER_THAN: ">" >
+| < GREATER_THAN_OR_EQUAL: ">=" >
+}
 TOKEN: /* String Literal */
 {
  < STRING_LITERAL : "\"" ( ~["\r", "\n", "\""])* "\"" >
@@ -261,7 +258,7 @@ void InitExpr() :
 void NewInitExpr() :
 {}
 {
-    BasicType() <LBRACKET> <NUM> <RBRACKET>
+    BasicType() <LBRACKET> <INTVAL> <RBRACKET>
 |
     <ID> <LPAREN> [Args()] <RPAREN>
 }
@@ -403,7 +400,7 @@ void Lvalue() :
 void Literal() :
 {}
 {
-    <NUM>
+    <INTVAL>
 |
     <REAL>
 |
