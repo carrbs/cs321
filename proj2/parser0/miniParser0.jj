@@ -88,7 +88,7 @@ TOKEN : /* IDs and Numbers */
 | < REAL: (((<DIGIT>)* "." (<DIGIT>)+) ("f" | "F")) | (((<DIGIT>)+ "." (<DIGIT>)*) ("f" | "F")) >
 }
 
-TOKEN : /* Delimiters / Operators */ 
+TOKEN : /* Delimiters & Operators */ 
 {
  < LPAREN: "(" >
 | < RPAREN: ")" >
@@ -114,6 +114,7 @@ TOKEN : /* Delimiters / Operators */
 | < GREATER_THAN: ">" >
 | < GREATER_THAN_OR_EQUAL: ">=" >
 }
+
 TOKEN: /* String Literal */
 {
  < STRING_LITERAL : "\"" ( ~["\r", "\n", "\""])* "\"" >
@@ -182,7 +183,7 @@ void VarDecl() :
     Type() <ID> [ <ASSIGNMENT> InitExpr() ] <SEMICOLON>
 }
 
-//Type       -> BasicType ["[" "]"] | <ID>
+// Type       -> BasicType ["[" "]"] | <ID>
 void Type() :
 {}
 {
@@ -234,7 +235,7 @@ void LvalueStatement() :
     <LPAREN> [Args()] <RPAREN> <SEMICOLON>
 }
 
-//Args       -> Expr {"," Expr}
+// Args       -> Expr {"," Expr}
 void Args() :
 {}
 {
@@ -290,10 +291,6 @@ void AndTail() :
     [ <AND> RelExpr() AndTail() ]
 }
 
-
-// RelExpr    -> RelExpr Relop ArithExpr
-//            |  ArithExpr
-
 // RelExpr      -> ArithExpr RelTail
 void RelExpr() :
 {}
@@ -301,17 +298,12 @@ void RelExpr() :
     ArithExpr() RelTail()
 }
 
-// RelTail      -> [ Relop RelExpr ArithExpr ]
+// RelTail      -> [ Relop ArithExpr ]
 void RelTail() :
 {}
 {
     [ Relop() ArithExpr() ]
 }
-
-
-// ArithExpr  -> ArithExpr "+" Term
-//            |  ArithExpr "-" Term
-//            |  Term
 
 // ArithExpr -> Term ArithTail
 void ArithExpr() :
@@ -335,10 +327,6 @@ void PlusMinusOp() :
 |
     <MINUS>
 }
-
-// Term       -> Term "*" Factor
-//            |  Term "/" Factor
-//            |  Factor
 
 // Term         -> Factor TermTail
 void Term() :
@@ -407,7 +395,7 @@ void Literal() :
     <TRUE>
 |
     <FALSE>
-}    
+}
 
 // Relop    -> "==" | "!=" | "<" | "<=" | ">" | ">="
 void Relop() :
