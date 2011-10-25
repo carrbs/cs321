@@ -4,8 +4,6 @@
  *
  * proj2 (miniParser0.jj)
  *
- * some of this code was designed by studying:
- * Javacc-5.0/examples/JavaCCGrammar/JavaCC.jj
  *
  * ***************************/
 
@@ -267,50 +265,50 @@ void NewInitExpr() :
 |
     <ID> <LPAREN> [Args()] <RPAREN>
 }
-// Expr         -> { AndExpr OrTail }
+// Expr         -> AndExpr OrTail
 void Expr() :
 {}
 {
-    ( AndExpr() OrTail() )*
+    AndExpr() OrTail() 
 }
 
-// OrTail       -> { "||"  AndExpr OrTail }
+// OrTail       -> [ "||"  AndExpr OrTail ]
 void OrTail() :
 {}
 {
-    ( <OR> AndExpr() OrTail() )*
+    [ <OR> AndExpr() OrTail() ]
 }
 
 // AndExpr    -> RelExpr AndTail
 void AndExpr() :
 {}
 {
-    ( RelExpr() AndTail() )*
+    RelExpr() AndTail() 
 }
 
-// AndTail()    -> { "&&" RelExpr AndTail }
+// AndTail()    -> [ "&&" RelExpr AndTail ]
 void AndTail() :
 {}
 {
-    ( <AND> RelExpr() AndTail() ) *
+    [ <AND> RelExpr() AndTail() ]
 }
 
 
 // RelExpr    -> RelExpr Relop ArithExpr
 //            |  ArithExpr
 
-// RelExpr      -> { ArithExpr RelTail }
+// RelExpr      -> ArithExpr RelTail
 void RelExpr() :
 {}
 {
-    ( ArithExpr() RelTail() )*
+    ArithExpr() RelTail()
 }
 
-// RelTail      -> Relop RelExpr ArithExpr
+// RelTail      -> [ Relop RelExpr ArithExpr ]
 void RelTail() :
 {}
 {
-    Relop() RelExpr() ArithExpr()
+    [ Relop() ArithExpr() ]
 }
 
 
@@ -325,15 +323,22 @@ void ArithExpr() :
     Term() ArithTail()
 }
 
-// ArithTail    -> "+" Term ArithTail | "-" Term ArithTail
+// ArithTail    -> [ PlusMinusOp Term ArithTail ]
 void ArithTail() :
 {}
 {
-    <PLUS> Term() ArithTail()
-|
-    <MINUS> Term() ArithTail()
+    [ PlusMinusOp()  Term() ArithTail() ]
 }
-    
+
+// PlusMinusOp      -> "+" | "-"
+void PlusMinusOp() :
+{}
+{
+    <PLUS>
+|
+    <MINUS>
+}
+
 // Term       -> Term "*" Factor
 //            |  Term "/" Factor
 //            |  Factor
@@ -345,15 +350,22 @@ void Term() :
     Factor() TermTail()
 }
 
-// TermTail      -> "*" Factor TermTail
-//              | "/" Factor TermTail
+// TermTail -> [ MultDivideOp Factor TermTail ]
 void TermTail() :
 {}
 {
-    <MULTIPLY> Factor() TermTail()
-    <DIVIDE> Factor() TermTail()
+    [ MultDivideOp()  Factor() TermTail() ]
 }
-    
+
+// MultDivideOp     -> "*" | "/"
+void MultDivideOp() :
+{}
+{
+    <MULTIPLY>
+|
+    <DIVIDE>
+}
+
 // Factor     -> Unop Factor
 //            |  "(" Expr ")"
 //            |  Lvalue [ LvalueFactor ]
