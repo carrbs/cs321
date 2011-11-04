@@ -1,0 +1,447 @@
+/* *************************** 
+ * Student: Benjamin Carr
+ * carrbs@cs.pdx.edu
+ *
+ * proj3 (miniParser.jj)
+ *
+ *
+ * ***************************/
+
+PARSER_BEGIN(miniParser) 
+package parser; 
+import ast.*;
+public class miniParser {}
+PARSER_END(miniParser)
+
+SKIP : /* WHITE SPACE */
+{
+  " "
+  | "\t"
+  | "\n"
+  | "\r"
+}
+
+MORE : /* Comments */
+{
+ "//" : IN_SINGLE_LINE_COMMENT
+| "/*" : IN_MULTI_LINE_COMMENT
+}
+
+<IN_SINGLE_LINE_COMMENT>
+SPECIAL_TOKEN :
+{
+ <SINGLE_LINE_COMMENT: "\n" | "\r" | "\r\n" > : DEFAULT
+}
+
+<IN_MULTI_LINE_COMMENT>
+SPECIAL_TOKEN :
+{
+ <MULTI_LINE_COMMENT: "*/" > : DEFAULT
+}
+
+<IN_SINGLE_LINE_COMMENT,IN_MULTI_LINE_COMMENT>
+MORE :
+{
+ < ~[] >
+}
+
+TOKEN : /* RESERVED WORDS AND LITERALS */
+{
+ < BOOLEAN: "boolean" >
+| < CLASS: "class" >
+| < ELSE: "else" >
+| < EXTENDS: "extends" >
+| < FALSE: "false" >
+| < FLOAT: "float" >
+| < IF: "if" >
+| < INT: "int" >
+| < LENGTH: "length" >
+| < MAIN: "main" >
+| < NEW: "new" >
+| < PUBLIC: "public" >
+| < RETURN: "return" >
+| < PRINT_LINE: "System.out.println" >
+| < STATIC: "static" >
+| < THIS: "this" >
+| < TRUE: "true" >
+| < VOID: "void" >
+| < WHILE: "while" >
+| < STRING: "String" >
+}
+
+
+TOKEN : /* IDs and Numbers */
+{
+  < #DIGIT: ["0"-"9"] > 
+| < #LETTER: ["A"-"Z"] | ["a"-"z"] > 
+| < ID: <LETTER> (<LETTER> | <DIGIT>)* > 
+  {
+        if (matchedToken.image.length() > 255)
+            throw new TokenMgrError("Lexical error at line "
+            + matchedToken.beginLine + ", column " + matchedToken.beginColumn + ".  Id length over 255", 0);
+  }
+| < INTVAL: (<DIGIT>)+ >
+  {
+        if (Long.valueOf(matchedToken.image) > 2147483647)
+            throw new TokenMgrError("Lexical error at line "
+            + matchedToken.beginLine + ", column " + matchedToken.beginColumn + ".  Integer value over 2^31-1", 0);
+  }
+| < REAL: (((<DIGIT>)* "." (<DIGIT>)+) ("f" | "F")) | (((<DIGIT>)+ "." (<DIGIT>)*) ("f" | "F")) >
+}
+
+TOKEN : /* Delimiters & Operators */ 
+{
+ < LPAREN: "(" >
+| < RPAREN: ")" >
+| < LBRACKET: "[" >
+| < RBRACKET: "]" >
+| < LBRACE: "{" >
+| < RBRACE: "}" >
+| < COMMA: "," >
+| < ASSIGNMENT: "=" >
+| < SEMICOLON: ";" >
+| < OR: "||" >
+| < AND: "&&" >
+| < PLUS: "+" >
+| < MINUS: "-" >
+| < MULTIPLY: "*" >
+| < DIVIDE: "/" >
+| < PERIOD: "." >
+| < NOT: "!" >
+| < EQUAL: "==" >
+| < NOT_EQUAL: "!=" >
+| < LESS_THAN: "<" >
+| < LESS_THAN_OR_EQUAL: "<=" >
+| < GREATER_THAN: ">" >
+| < GREATER_THAN_OR_EQUAL: ">=" >
+}
+
+TOKEN: /* String Literal */
+{
+ < STRING_LITERAL : "\"" ( ~["\r", "\n", "\""])* "\"" >
+ { 
+    if (matchedToken.image.length() > 257) 
+        throw new TokenMgrError("Lexical error at line "
+        + matchedToken.beginLine + ", column " + matchedToken.beginColumn + ". String length over 255", 0);
+ }
+}
+
+// Program    -> ClassDecl {ClassDecl}
+Program Program() :
+{ ClassDecl c; ClassDeclList cl = new ClassDeclList(); }
+{
+    c = ClassDecl() { cl.add(c); } ( c=ClassDecl() { cl.add(c); })* <EOF>
+    { return new Program(cl); }
+}
+
+// ClassDecl  -> "class" <ID> ["extends" <ID>] "{" {VarDecl} {MethodDecl} "}"
+ClassDecl ClassDecl() :
+{   Token tkn; Id ci; Id pi = null; 
+    VarDecl v;
+    MethodDecl m;
+    VarDeclList avl = new VarDeclList(); 
+    MethodDeclList aml = new MethodDeclList();
+}
+{
+    <CLASS> tkn=<ID>{ ci = new Id(tkn.toString()); }
+    [ <EXTENDS> <ID>{ pi = new Id(tkn.toString()); } ]
+    <LBRACE> ( v = VarDecl() { avl.add(v); } )* 
+    ( m = PublicMethodDecl() { aml.add(m); })* <RBRACE>
+    { return new ClassDecl(ci, pi, avl, aml); }
+}
+
+// PublicMethodDecl -> "public" MethodDecl
+MethodDecl PublicMethodDecl() :
+{ MethodDecl m; }
+{
+    <PUBLIC> m = MethodDecl()
+    { return m ; }
+}
+
+// MethodDecl -> Type <ID> "(" [Formals] ")" MethodBody
+//            |  "void" <ID> "(" [Formals] ")" MethodBody
+//            |  "static" "void" "main" "(" "String" "[" "]" <ID> ")"
+//                        MethodBody
+MethodDecl MethodDecl() :
+{Type at; Token tkn; Id i; FormalList afl = null; MethodDecl m; }  
+{
+    at = Type() tkn=<ID>{ i = new Id(tkn.toString()); }
+    <LPAREN> [afl = Formals()] <RPAREN> m = MethodBody()
+    { return new MethodDecl(at, i, afl, m.vl, m.sl); }
+|
+    <VOID>{ at = new ObjType(new Id("void")); } tkn=<ID>{ i = new Id(tkn.toString()); }
+    <LPAREN> [afl = Formals()] <RPAREN> m = MethodBody()
+    { return new MethodDecl(at, i, afl, m.vl, m.sl); }
+|
+    <STATIC> <VOID> <MAIN> <LPAREN> <STRING> <LBRACKET> <RBRACKET> <ID> <RPAREN>
+        m = MethodBody()
+    { at = new ObjType(new Id("void"));
+      i = new Id("main");
+      FormalList fl = new FormalList();
+      return new MethodDecl(at, i, fl, m.vl, m.sl);
+    }
+}
+
+
+// MethodBody -> "{" {VarDecl} {Statement} "}"
+MethodDecl MethodBody() :
+{}
+{
+    <LBRACE> ( LOOKAHEAD(2) VarDecl() )* ( Statement() )* <RBRACE>
+    { return new MethodDecl(null, null, null, 
+}
+
+// Formals    -> Type <ID> {"," Type <ID>}
+void Formals() : 
+{}
+{
+    Type() <ID> ( <COMMA> Type() <ID> )*
+}
+
+// VarDecl    -> Type <ID> ["=" InitExpr] ";"
+void VarDecl() : 
+{}
+{
+    Type() <ID> [ <ASSIGNMENT> InitExpr() ] <SEMICOLON>
+}
+
+// Type       -> BasicType ["[" "]"] | <ID>
+void Type() :
+{}
+{
+    BasicType() [<LBRACKET> <RBRACKET>] 
+|
+    <ID>
+}
+
+// BasicType  -> "int" | "float" | "boolean"
+void BasicType() :
+{}
+{
+    <INT>
+|
+    <FLOAT>
+|
+    <BOOLEAN>
+}
+
+// Statement  -> "{" {Statement} "}"
+//            |  Lvalue LvalueStatement
+//            |  "if" "(" Expr ")" Statement ["else" Statement]
+//            |  "while" "(" Expr ")" Statement
+//            |  "System.out.println" "(" [Expr | <STRVAL>] ")" ";"
+//            |  "return" [Expr] ";"
+void Statement() :
+{}
+{
+    <LBRACE> ( Statement() )* <RBRACE>
+|
+    Lvalue() LvalueStatement()
+|
+    <IF> <LPAREN> Expr() <RPAREN> Statement() [LOOKAHEAD(1) <ELSE> Statement()]
+|
+    <WHILE> <LPAREN> Expr() <RPAREN> Statement()
+|
+    <PRINT_LINE> <LPAREN> [Expr() | <STRING_LITERAL>] <RPAREN> <SEMICOLON>
+|
+    <RETURN> [Expr()] <SEMICOLON>
+}
+
+// LvalueStatement      -> "=" InitExpr ";"
+//                      |  "(" [Args] ")" ";"
+void LvalueStatement() :
+{}
+{
+    <ASSIGNMENT> InitExpr() <SEMICOLON>
+|
+    <LPAREN> [Args()] <RPAREN> <SEMICOLON>
+}
+
+// Args       -> Expr {"," Expr}
+void Args() :
+{}
+{
+    Expr() ( <COMMA> Expr() )*
+}
+
+
+// InitExpr   -> "new" NewIntExpr
+//            |  Expr
+void InitExpr() :
+{}
+{
+    <NEW> NewInitExpr()
+|
+    Expr()
+}
+
+
+// NewInitExpr  -> BasicType "[" <INTVAL> "]"
+//              |  <ID> "(" [Args] ")"
+void NewInitExpr() :
+{}
+{
+    BasicType() <LBRACKET> <INTVAL> <RBRACKET>
+|
+    <ID> <LPAREN> [Args()] <RPAREN>
+}
+// Expr         -> AndExpr OrTail
+void Expr() :
+{}
+{
+    AndExpr() OrTail() 
+}
+
+// OrTail       -> [ "||"  AndExpr OrTail ]
+void OrTail() :
+{}
+{
+    [ <OR> AndExpr() OrTail() ]
+}
+
+// AndExpr    -> RelExpr AndTail
+void AndExpr() :
+{}
+{
+    RelExpr() AndTail() 
+}
+
+// AndTail()    -> [ "&&" RelExpr AndTail ]
+void AndTail() :
+{}
+{
+    [ <AND> RelExpr() AndTail() ]
+}
+
+// RelExpr      -> ArithExpr RelTail
+void RelExpr() :
+{}
+{
+    ArithExpr() RelTail()
+}
+
+// RelTail      -> [ Relop ArithExpr ]
+void RelTail() :
+{}
+{
+    [ Relop() ArithExpr() ]
+}
+
+// ArithExpr -> Term ArithTail
+void ArithExpr() :
+{}
+{
+    Term() ArithTail()
+}
+
+// ArithTail    -> [ PlusMinusOp Term ArithTail ]
+void ArithTail() :
+{}
+{
+    [ PlusMinusOp()  Term() ArithTail() ]
+}
+
+// PlusMinusOp      -> "+" | "-"
+void PlusMinusOp() :
+{}
+{
+    <PLUS>
+|
+    <MINUS>
+}
+
+// Term         -> Factor TermTail
+void Term() :
+{}
+{
+    Factor() TermTail()
+}
+
+// TermTail -> [ MultDivideOp Factor TermTail ]
+void TermTail() :
+{}
+{
+    [ MultDivideOp()  Factor() TermTail() ]
+}
+
+// MultDivideOp     -> "*" | "/"
+void MultDivideOp() :
+{}
+{
+    <MULTIPLY>
+|
+    <DIVIDE>
+}
+
+// Factor     -> Unop Factor
+//            |  "(" Expr ")"
+//            |  Lvalue [ LvalueFactor ]
+//            |  Literal
+void Factor() :
+{}
+{
+    Unop() Factor()
+|
+    <LPAREN> Expr() <RPAREN>
+|
+    Lvalue() [ LvalueFactor() ]
+|
+    Literal()
+}
+
+//  LvalueFactor    -> "(" [Args] ")"
+//                  |  "." "length" "(" ")"
+void LvalueFactor() :
+{}
+{
+    <LPAREN> [ Args() ] <RPAREN>
+|
+    <PERIOD> <LENGTH> <LPAREN> <RPAREN>
+}
+
+// Lvalue     -> ["this" "."] <ID> {"." <ID>} ["[" Expr "]"]
+void Lvalue() :
+{}
+{
+    [ <THIS> <PERIOD> ] <ID> ( LOOKAHEAD(2) <PERIOD> <ID> )* [ <LBRACKET> Expr() <RBRACKET> ]
+}
+
+// Literal    -> <INTVAL> | <FLOATVAL> | "true" | "false"
+void Literal() :
+{}
+{
+    <INTVAL>
+|
+    <REAL>
+|
+    <TRUE>
+|
+    <FALSE>
+}
+
+// Relop    -> "==" | "!=" | "<" | "<=" | ">" | ">="
+void Relop() :
+{}
+{
+    <EQUAL>
+|
+    <NOT_EQUAL>
+|
+    <LESS_THAN>
+|
+    <LESS_THAN_OR_EQUAL>
+|
+    <GREATER_THAN>
+|
+    <GREATER_THAN_OR_EQUAL>
+}
+
+
+// Unop       -> "-" | "!"
+void Unop() :
+{}
+{
+    <MINUS>
+|
+    <NOT>
+}
