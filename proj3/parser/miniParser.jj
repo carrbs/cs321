@@ -146,115 +146,118 @@ ClassDecl ClassDecl() :
     <CLASS> tkn=<ID>{ ci = new Id(tkn.toString()); }
     [ <EXTENDS> <ID>{ pi = new Id(tkn.toString()); } ]
     <LBRACE> ( v = VarDecl() { avl.add(v); } )* 
-    ( m = PublicMethodDecl() { aml.add(m); })* <RBRACE>
+    ( m = MethodDecl() { aml.add(m); })* <RBRACE>
     { return new ClassDecl(ci, pi, avl, aml); }
 }
 
-// PublicMethodDecl -> "public" MethodDecl
-MethodDecl PublicMethodDecl() :
-{ MethodDecl m; }
-{
-    <PUBLIC> m = MethodDecl()
-    { return m ; }
-}
-
-// MethodDecl -> Type <ID> "(" [Formals] ")" MethodBody
-//            |  "void" <ID> "(" [Formals] ")" MethodBody
-//            |  "static" "void" "main" "(" "String" "[" "]" <ID> ")"
-//                        MethodBody
+// MethodDecl -> "public" ( (Type | "void") <ID> '(' [Formals] ')' 
+//                      | "static" "void" "main" '(' "String" '[' ']' <ID> ')' )
+//                                       '{' {VarDecl} {Statement} '}'
 MethodDecl MethodDecl() :
-{Type at; Token tkn; Id i; FormalList afl = null; MethodDecl m; }  
 {
-    at = Type() tkn=<ID>{ i = new Id(tkn.toString()); }
-    <LPAREN> [afl = Formals()] <RPAREN> m = MethodBody()
-    { return new MethodDecl(at, i, afl, m.vl, m.sl); }
-|
-    <VOID>{ at = new ObjType(new Id("void")); } tkn=<ID>{ i = new Id(tkn.toString()); }
-    <LPAREN> [afl = Formals()] <RPAREN> m = MethodBody()
-    { return new MethodDecl(at, i, afl, m.vl, m.sl); }
-|
-    <STATIC> <VOID> <MAIN> <LPAREN> <STRING> <LBRACKET> <RBRACKET> <ID> <RPAREN>
-        m = MethodBody()
-    { at = new ObjType(new Id("void"));
-      i = new Id("main");
-      FormalList fl = new FormalList();
-      return new MethodDecl(at, i, fl, m.vl, m.sl);
-    }
+    Type at; Token tkn; Id i; 
+    FormalList afl = null; 
+    VarDecl v; VarDeclList avl;
+    Stmt s; StmtList asl;
 }
-
-
-// MethodBody -> "{" {VarDecl} {Statement} "}"
-MethodDecl MethodBody() :
-{}
 {
-    <LBRACE> ( LOOKAHEAD(2) VarDecl() )* ( Statement() )* <RBRACE>
-    { return new MethodDecl(null, null, null, 
+    <PUBLIC> ( (at = Type() | <VOID>) tkn=<ID>{ i = new Id(tkn.toString()); }
+    <LPAREN> [afl = Formals()] <RPAREN> 
+    |
+    <STATIC> <VOID> <MAIN> <LPAREN> <STRING> <LBRACKET> <RBRACKET> <ID>
+    <RPAREN>)
+    <LBRACE> ( LOOKAHEAD(2) v = VarDecl() { avl.add(v); } )* ( s = Statement() {
+    asl.add(s) )* <RBRACE>
+    { return new MethodDecl(at, i, afl, avl, asl); }
 }
 
 // Formals    -> Type <ID> {"," Type <ID>}
-void Formals() : 
-{}
+FormalList Formals() : 
+{FormalList afl = new FormalList(); Formal f; Type t; Id i; Token tkn; }
 {
-    Type() <ID> ( <COMMA> Type() <ID> )*
+    t = Type() tkn=<ID>{ i = new Id(tkn.toString()); f = new Formal(t, i);
+    afl.add(f); } 
+    ( <COMMA> t = Type() tkn=<ID>{ i = new Id(tkn.toString()); f = new Formal(t,
+    i); afl.add(f); } )*
+    { return afl; }
+
 }
 
 // VarDecl    -> Type <ID> ["=" InitExpr] ";"
-void VarDecl() : 
-{}
+VarDecl VarDecl() : 
+{ Type t; Token tkn; Id i; Exp e;}
 {
-    Type() <ID> [ <ASSIGNMENT> InitExpr() ] <SEMICOLON>
+    t = Type() tkn=<ID>{ i = new Id(tkn.toString()); } 
+    [ <ASSIGNMENT> e = InitExpr() ] <SEMICOLON>
+    { return new VarDecl(t, i, e); }
 }
 
 // Type       -> BasicType ["[" "]"] | <ID>
-void Type() :
-{}
+Type Type() :
+{ Type t; boolean isArray = false; Token t; Id i;}
 {
-    BasicType() [<LBRACKET> <RBRACKET>] 
+    t = BasicType() [<LBRACKET> <RBRACKET> { isArray = true;}] 
+    {
+        if (isArray) 
+            return new ArrayType(t); 
+        else return t;
+    }
 |
-    <ID>
+    tkn=<ID>{ i = new(tkn.toString()); return new ObjType(i); }
 }
 
 // BasicType  -> "int" | "float" | "boolean"
-void BasicType() :
+Type BasicType() :
 {}
 {
     <INT>
+    { return new BasicType(BasicType.Int); }
 |
     <FLOAT>
+    { return new BasicType(BasicType.Float); }
 |
     <BOOLEAN>
+    { return new BasicType(BasicType.Bool); }
 }
 
 // Statement  -> "{" {Statement} "}"
-//            |  Lvalue LvalueStatement
+//            |  Lvalue ('=' InitExpr | '(' [Args] ')') ';'
 //            |  "if" "(" Expr ")" Statement ["else" Statement]
 //            |  "while" "(" Expr ")" Statement
 //            |  "System.out.println" "(" [Expr | <STRVAL>] ")" ";"
 //            |  "return" [Expr] ";"
-void Statement() :
-{}
+Stmt Statement() :
+{ boolean isAssign = false; Exp ex = null; StmtList asl; Stmt s1 = null, s2 = null; StrVal sv;}
 {
-    <LBRACE> ( Statement() )* <RBRACE>
+    <LBRACE> ( s1 = Statement(){ asl.add(s1); } )* <RBRACE>
+    { return new Block(asl); }
 |
-    Lvalue() LvalueStatement()
+    Lvalue() (<ASSIGNMENT> InitExpr(){isAssign = true;} 
+        | <LPAREN> [Args()] <RPAREN>) <SEMICOLON>
+    {
+        if (isAssign)
+            return new Assign(ass);
+        else
+            return new CallStmt;
+    }
 |
-    <IF> <LPAREN> Expr() <RPAREN> Statement() [LOOKAHEAD(1) <ELSE> Statement()]
+    <IF> <LPAREN> ex = Expr() <RPAREN> s1 = Statement() 
+    [LOOKAHEAD(1) <ELSE> s2 = Statement()]
+    { return new If(ex, s1, s2); }
 |
-    <WHILE> <LPAREN> Expr() <RPAREN> Statement()
+    <WHILE> <LPAREN> ex = Expr() <RPAREN> s1 = Statement()
+    { return new While(ex, s1); }
 |
-    <PRINT_LINE> <LPAREN> [Expr() | <STRING_LITERAL>] <RPAREN> <SEMICOLON>
+    <PRINT_LINE> <LPAREN> [ex = Expr() | tkn=<STRING_LITERAL>
+    { sv = new StrVal(tkn.toString().replace("\"", "")); } ] <RPAREN> <SEMICOLON>
+    {
+        if (ex == null)
+            return new Print(sv);
+        else return new Print(ex); 
+    }
 |
-    <RETURN> [Expr()] <SEMICOLON>
-}
-
-// LvalueStatement      -> "=" InitExpr ";"
-//                      |  "(" [Args] ")" ";"
-void LvalueStatement() :
-{}
-{
-    <ASSIGNMENT> InitExpr() <SEMICOLON>
-|
-    <LPAREN> [Args()] <RPAREN> <SEMICOLON>
+    <RETURN> [ ex = Expr() ] <SEMICOLON>
+    { return new Return(ex); }
 }
 
 // Args       -> Expr {"," Expr}
@@ -264,27 +267,18 @@ void Args() :
     Expr() ( <COMMA> Expr() )*
 }
 
-
-// InitExpr   -> "new" NewIntExpr
+// InitExpr   -> "new" ( BasicType '[' <INTVAL> ']' | <ID> '(' [Args] ')' )
 //            |  Expr
 void InitExpr() :
 {}
 {
-    <NEW> NewInitExpr()
+    <NEW> ( BasicType() <LBRACKET> <INTVAL> <RBRACKET> 
+    |
+    <ID> <LPAREN> [Args()] <RPAREN>)
 |
     Expr()
 }
 
-
-// NewInitExpr  -> BasicType "[" <INTVAL> "]"
-//              |  <ID> "(" [Args] ")"
-void NewInitExpr() :
-{}
-{
-    BasicType() <LBRACKET> <INTVAL> <RBRACKET>
-|
-    <ID> <LPAREN> [Args()] <RPAREN>
-}
 // Expr         -> AndExpr OrTail
 void Expr() :
 {}
@@ -313,18 +307,11 @@ void AndTail() :
     [ <AND> RelExpr() AndTail() ]
 }
 
-// RelExpr      -> ArithExpr RelTail
+// RelExpr    -> ArithExpr [RelOp ArithExpr]
 void RelExpr() :
 {}
 {
-    ArithExpr() RelTail()
-}
-
-// RelTail      -> [ Relop ArithExpr ]
-void RelTail() :
-{}
-{
-    [ Relop() ArithExpr() ]
+    ArithExpr() [ Relop() ArithExpr() ]
 }
 
 // ArithExpr -> Term ArithTail
@@ -375,7 +362,7 @@ void MultDivideOp() :
 
 // Factor     -> Unop Factor
 //            |  "(" Expr ")"
-//            |  Lvalue [ LvalueFactor ]
+//            |  Lvalue ['.' "length" '(' ')' | '(' [Args] ')']
 //            |  Literal
 void Factor() :
 {}
@@ -384,26 +371,47 @@ void Factor() :
 |
     <LPAREN> Expr() <RPAREN>
 |
-    Lvalue() [ LvalueFactor() ]
+    Lvalue() [ <LPAREN> [ Args() ] <RPAREN>
+    |
+    <PERIOD> <LENGTH> <LPAREN> <RPAREN> ]
 |
     Literal()
 }
 
-//  LvalueFactor    -> "(" [Args] ")"
-//                  |  "." "length" "(" ")"
-void LvalueFactor() :
-{}
-{
-    <LPAREN> [ Args() ] <RPAREN>
-|
-    <PERIOD> <LENGTH> <LPAREN> <RPAREN>
-}
-
 // Lvalue     -> ["this" "."] <ID> {"." <ID>} ["[" Expr "]"]
-void Lvalue() :
-{}
+Exp Lvalue() :
+{boolean isThis = false; Exp e = null; Id i; Token tkn; Field f = null;}
 {
-    [ <THIS> <PERIOD> ] <ID> ( LOOKAHEAD(2) <PERIOD> <ID> )* [ <LBRACKET> Expr() <RBRACKET> ]
+    [ <THIS> <PERIOD>{ isThis = true; } ] tkn=<ID> 
+    { 
+        if (isThis)
+            f = new Field(new This(), new Id(tkn.toString());
+        else
+            i = new Id(tkn.toString());
+    }
+    ( LOOKAHEAD(2) <PERIOD> <ID>
+    { 
+        if (f == null)
+            f = new Field(i, new Id(tkn.toString());
+        else
+            f = new Field(f, new Id(tkn.toString());
+    }
+        )* [ <LBRACKET> e = Expr() <RBRACKET> ]
+        {
+            if (e != null)
+            {
+                if (f != null)
+                    return new ArrayElm(f, e);
+                else return new ArrayElm(i, e);
+            }
+            else
+            {
+                if(f != null)
+                    return f;
+                else
+                    return i;
+            }
+        }
 }
 
 // Literal    -> <INTVAL> | <FLOATVAL> | "true" | "false"
