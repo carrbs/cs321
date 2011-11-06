@@ -155,10 +155,10 @@ ClassDecl ClassDecl() :
 //                                       '{' {VarDecl} {Statement} '}'
 MethodDecl MethodDecl() :
 {
-    Type at; Token tkn; Id i; 
+    Type at = null; Token tkn; Id i = null; 
     FormalList afl = null; 
-    VarDecl v; VarDeclList avl;
-    Stmt s; StmtList asl;
+    VarDecl v; VarDeclList avl = null;
+    Stmt s; StmtList asl = null;
 }
 {
     <PUBLIC> ( (at = Type() | <VOID>) tkn=<ID>{ i = new Id(tkn.toString()); }
@@ -167,7 +167,7 @@ MethodDecl MethodDecl() :
     <STATIC> <VOID> <MAIN> <LPAREN> <STRING> <LBRACKET> <RBRACKET> <ID>
     <RPAREN>)
     <LBRACE> ( LOOKAHEAD(2) v = VarDecl() { avl.add(v); } )* ( s = Statement() {
-    asl.add(s) )* <RBRACE>
+    asl.add(s); } )* <RBRACE>
     { return new MethodDecl(at, i, afl, avl, asl); }
 }
 
@@ -185,7 +185,7 @@ FormalList Formals() :
 
 // VarDecl    -> Type <ID> ["=" InitExpr] ";"
 VarDecl VarDecl() : 
-{ Type t; Token tkn; Id i; Exp e;}
+{ Type t; Token tkn; Id i; Exp e = null;}
 {
     t = Type() tkn=<ID>{ i = new Id(tkn.toString()); } 
     [ <ASSIGNMENT> e = InitExpr() ] <SEMICOLON>
@@ -194,7 +194,7 @@ VarDecl VarDecl() :
 
 // Type       -> BasicType ["[" "]"] | <ID>
 Type Type() :
-{ Type t; boolean isArray = false; Token t; Id i;}
+{ Type t; boolean isArray = false; Token tkn; Id i; }
 {
     t = BasicType() [<LBRACKET> <RBRACKET> { isArray = true;}] 
     {
@@ -203,7 +203,7 @@ Type Type() :
         else return t;
     }
 |
-    tkn=<ID>{ i = new(tkn.toString()); return new ObjType(i); }
+    tkn=<ID>{ i = new Id(tkn.toString()); return new ObjType(i); }
 }
 
 // BasicType  -> "int" | "float" | "boolean"
@@ -227,18 +227,38 @@ Type BasicType() :
 //            |  "System.out.println" "(" [Expr | <STRVAL>] ")" ";"
 //            |  "return" [Expr] ";"
 Stmt Statement() :
-{ boolean isAssign = false; Exp ex = null; StmtList asl; Stmt s1 = null, s2 = null; StrVal sv;}
+{ 
+    boolean isAssign = false; 
+    Exp ex = null, ex2 = null; 
+    StmtList asl = null; 
+    Stmt s1 = null, s2 = null; 
+    StrVal sv = null;
+    ExpList a = null;
+    Token tkn;
+}
 {
     <LBRACE> ( s1 = Statement(){ asl.add(s1); } )* <RBRACE>
     { return new Block(asl); }
 |
-    Lvalue() (<ASSIGNMENT> InitExpr(){isAssign = true;} 
-        | <LPAREN> [Args()] <RPAREN>) <SEMICOLON>
+    ex = Lvalue() (<ASSIGNMENT> ex2 = InitExpr(){isAssign = true;} 
+        | <LPAREN> [a = Args()] <RPAREN>) <SEMICOLON>
     {
         if (isAssign)
-            return new Assign(ass);
+            return new Assign(ex, ex2);
         else
-            return new CallStmt;
+        {
+            if (ex instanceof Id)
+            {
+                Id foo = (Id) ex;
+                return new CallStmt(new This(), foo, a);
+            }
+            else if (ex instanceof Field)
+            {
+                Field foo = (Field) ex;
+                return new CallStmt(foo.obj, foo.var, a);
+            }
+            else return null;
+        }
     }
 |
     <IF> <LPAREN> ex = Expr() <RPAREN> s1 = Statement() 
@@ -249,11 +269,14 @@ Stmt Statement() :
     { return new While(ex, s1); }
 |
     <PRINT_LINE> <LPAREN> [ex = Expr() | tkn=<STRING_LITERAL>
-    { sv = new StrVal(tkn.toString().replace("\"", "")); } ] <RPAREN> <SEMICOLON>
+    {
+        String tmp = tkn.toString().replace("\"", "");
+        sv = new StrVal(tmp);
+    } ] <RPAREN> <SEMICOLON>
     {
         if (ex == null)
             return new Print(sv);
-        else return new Print(ex); 
+        else return new Print(ex);
     }
 |
     <RETURN> [ ex = Expr() ] <SEMICOLON>
@@ -261,140 +284,205 @@ Stmt Statement() :
 }
 
 // Args       -> Expr {"," Expr}
-void Args() :
-{}
+ExpList Args() :
+{ExpList ael = new ExpList(); Exp e;}
 {
-    Expr() ( <COMMA> Expr() )*
+    e = Expr(){ ael.add(e); } ( <COMMA> e = Expr(){ ael.add(e); } )*
+    { return ael; }
 }
 
 // InitExpr   -> "new" ( BasicType '[' <INTVAL> ']' | <ID> '(' [Args] ')' )
 //            |  Expr
-void InitExpr() :
-{}
+Exp InitExpr() :
+{ 
+    Type t = null; 
+    Token tkn; 
+    Exp ex; 
+    ExpList el = null;
+    boolean isArray = false; 
+    int n = 0;
+    Id i = null;
+}
 {
-    <NEW> ( BasicType() <LBRACKET> <INTVAL> <RBRACKET> 
+    <NEW> ( t = BasicType() <LBRACKET> tkn=<INTVAL>
+    { n = Integer.parseInt(tkn.toString()); }
+    <RBRACKET> { isArray = true; }
     |
-    <ID> <LPAREN> [Args()] <RPAREN>)
+    tkn=<ID>{ i = new Id(tkn.toString()); } <LPAREN> [el = Args()] <RPAREN>)
+    {
+        if (isArray == true)
+            return new NewArray(t, n);
+        else
+            return new NewObj(i, el);
+    }
 |
-    Expr()
+    ex = Expr()
+    { return ex; }
 }
 
 // Expr         -> AndExpr OrTail
-void Expr() :
-{}
+Exp Expr() :
+{ Exp e1, e2 = null;}
 {
-    AndExpr() OrTail() 
+    e1=AndExpr() e2=OrTail(e1) 
+    { return e2==null ? e1 : e2; }
 }
 
 // OrTail       -> [ "||"  AndExpr OrTail ]
-void OrTail() :
-{}
+Exp OrTail(Exp e0) :
+{ Exp e1 = null, e2 = null;}
 {
-    [ <OR> AndExpr() OrTail() ]
+    [ <OR> e1=AndExpr() { e1 = new Binop(Binop.OR, e0, e1); } e2=OrTail(e1) ]
+    { return e2==null ? e1 : e2; }
 }
 
 // AndExpr    -> RelExpr AndTail
-void AndExpr() :
-{}
+Exp AndExpr() :
+{ Exp e1, e2 = null;}
 {
-    RelExpr() AndTail() 
+    e1=RelExpr() e2=AndTail(e1) 
+    { return e2==null ? e1 : e2; }
 }
 
 // AndTail()    -> [ "&&" RelExpr AndTail ]
-void AndTail() :
-{}
+Exp AndTail(Exp e0) :
+{ Exp e1 = null, e2 = null; }
 {
-    [ <AND> RelExpr() AndTail() ]
+    [ <AND> e1=RelExpr() { e1 = new Binop(Binop.AND, e0, e1); } e2=AndTail(e1) ]
+    { return e2==null ? e1 : e2; }
 }
 
 // RelExpr    -> ArithExpr [RelOp ArithExpr]
-void RelExpr() :
-{}
+Exp RelExpr() :
+{ Exp e1, e2 = null; int o; }
 {
-    ArithExpr() [ Relop() ArithExpr() ]
+    e1=ArithExpr() [ o=Relop() e2=ArithExpr() { e2 = new Relop(o, e1, e2); }]
+    { return e2==null ? e1 : e2; }
 }
 
 // ArithExpr -> Term ArithTail
-void ArithExpr() :
-{}
+Exp ArithExpr() :
+{ Exp e1, e2 = null; }
 {
-    Term() ArithTail()
+    e1=Term() e2=ArithTail(e1)
+    { return e2==null ? e1 : e2; }
 }
 
 // ArithTail    -> [ PlusMinusOp Term ArithTail ]
-void ArithTail() :
-{}
+Exp ArithTail(Exp e0) :
+{ Exp e1 = null, e2 = null; int op; }
 {
-    [ PlusMinusOp()  Term() ArithTail() ]
+    [ op=PlusMinusOp()  e1=Term() { e1 = new Binop(op, e0, e1); } e2=ArithTail(e1) ]
+    { return e2==null ? e1 : e2; }
 }
 
 // PlusMinusOp      -> "+" | "-"
-void PlusMinusOp() :
+int PlusMinusOp() :
 {}
 {
     <PLUS>
+    { return Binop.ADD; }
 |
     <MINUS>
+    { return Binop.SUB; }
 }
 
 // Term         -> Factor TermTail
-void Term() :
-{}
+Exp Term() :
+{ Exp e1, e2 = null; }
 {
-    Factor() TermTail()
+    e1=Factor() e2=TermTail(e1)
+    { return e2==null ? e1 : e2; }
 }
 
 // TermTail -> [ MultDivideOp Factor TermTail ]
-void TermTail() :
-{}
+Exp TermTail(Exp e0) :
+{ Exp e1 = null, e2 = null; int op; }
 {
-    [ MultDivideOp()  Factor() TermTail() ]
+    [ op=MultDivideOp()  e1=Factor() { e1 = new Binop(op, e0, e1); } e2=TermTail(e1) ]
+    { return e2==null ? e1 : e2; }
 }
 
 // MultDivideOp     -> "*" | "/"
-void MultDivideOp() :
+int MultDivideOp() :
 {}
 {
     <MULTIPLY>
+    { return Binop.MUL; }
 |
     <DIVIDE>
+    { return Binop.DIV; }
 }
 
 // Factor     -> Unop Factor
 //            |  "(" Expr ")"
 //            |  Lvalue ['.' "length" '(' ')' | '(' [Args] ')']
 //            |  Literal
-void Factor() :
-{}
+Exp Factor() :
 {
-    Unop() Factor()
+    int op;
+    Exp e1 = null;
+    ExpList el = null;
+    boolean isLength = false;
+    boolean isCall = false;
+}
+{
+    op=Unop() e1=Factor() { e1 = new Unop(op, e1); }
+    { return e1; }
 |
-    <LPAREN> Expr() <RPAREN>
+    <LPAREN> e1=Expr() <RPAREN>
+    { return e1; }
 |
-    Lvalue() [ <LPAREN> [ Args() ] <RPAREN>
+    e1=Lvalue() [ <LPAREN> [ el=Args() ] <RPAREN> { isCall = true; }
     |
-    <PERIOD> <LENGTH> <LPAREN> <RPAREN> ]
+    <PERIOD> <LENGTH> <LPAREN> <RPAREN> { isLength = true; }]
+    {
+        if (isCall)
+        {
+            if (e1 instanceof Field)
+            {
+                Field eField = (Field) e1;
+                return new Call(eField.obj, eField.var, el);
+            }
+            else if (e1 instanceof Id)
+            {
+                Id eId = (Id) e1;
+                return new Call(new This(), eId, el);
+            }
+            else return null;
+        }
+        else if (isLength)
+            return new ArrayLen(e1);
+        else return e1;
+    }
 |
-    Literal()
+    e1=Literal()
+    { return e1; }
 }
 
 // Lvalue     -> ["this" "."] <ID> {"." <ID>} ["[" Expr "]"]
 Exp Lvalue() :
-{boolean isThis = false; Exp e = null; Id i; Token tkn; Field f = null;}
+{
+    boolean isThis = false; 
+    Exp e = null; 
+    Id i = null; 
+    Token tkn; 
+    Field f = null;
+}
 {
     [ <THIS> <PERIOD>{ isThis = true; } ] tkn=<ID> 
     { 
         if (isThis)
-            f = new Field(new This(), new Id(tkn.toString());
+            f = new Field(new This(), new Id(tkn.toString()));
         else
             i = new Id(tkn.toString());
     }
     ( LOOKAHEAD(2) <PERIOD> <ID>
     { 
         if (f == null)
-            f = new Field(i, new Id(tkn.toString());
+            f = new Field(i, new Id(tkn.toString()));
         else
-            f = new Field(f, new Id(tkn.toString());
+            f = new Field(f, new Id(tkn.toString()));
     }
         )* [ <LBRACKET> e = Expr() <RBRACKET> ]
         {
@@ -415,41 +503,53 @@ Exp Lvalue() :
 }
 
 // Literal    -> <INTVAL> | <FLOATVAL> | "true" | "false"
-void Literal() :
-{}
+Exp Literal() :
+{Token tkn; Exp e;}
 {
-    <INTVAL>
+    tkn=<INTVAL>{ e = new IntVal(Integer.parseInt(tkn.toString())); }
+    { return e; }
 |
-    <REAL>
+    tkn=<REAL>{ e = new FloatVal(Float.parseFloat(tkn.toString())); }
+    { return e; }
 |
-    <TRUE>
+    tkn=<TRUE>{ e = new BoolVal(Boolean.parseBoolean(tkn.toString())); }
+    { return e; }
 |
-    <FALSE>
+    tkn=<FALSE>{ e = new BoolVal(Boolean.parseBoolean(tkn.toString())); }
+    { return e; }
 }
 
 // Relop    -> "==" | "!=" | "<" | "<=" | ">" | ">="
-void Relop() :
+int Relop() :
 {}
 {
     <EQUAL>
+    { return Relop.EQ; }
 |
     <NOT_EQUAL>
+    { return Relop.NE; }
 |
     <LESS_THAN>
+    { return Relop.LT; }
 |
     <LESS_THAN_OR_EQUAL>
+    { return Relop.LE; }
 |
     <GREATER_THAN>
+    { return Relop.GT; }
 |
     <GREATER_THAN_OR_EQUAL>
+    { return Relop.GE; }
 }
 
 
 // Unop       -> "-" | "!"
-void Unop() :
+int Unop() :
 {}
 {
     <MINUS>
+    { return Unop.NEG; }
 |
     <NOT>
+    { return Unop.NOT; }
 }
