@@ -1,6 +1,9 @@
+# Universal
+*.tar
+
+# proj2
 proj2/tst/*.perr
 proj2/parser0/*.class
-*.tar
 proj2/parser0/ParseException.java
 proj2/parser0/SimpleCharStream.java
 proj2/parser0/Token.java
@@ -8,3 +11,10 @@ proj2/parser0/TokenMgrError.java
 proj2/parser0/miniParser0.java
 proj2/parser0/miniParser0Constants.java
 proj2/parser0/miniParser0TokenManager.java
+# proj3
+proj3/parser/*.class
+proj3/parser/*.java
+proj3/Makefile
+proj3/ast/
+proj3/runp
+proj3/tst/
