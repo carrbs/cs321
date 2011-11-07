@@ -144,7 +144,7 @@ ClassDecl ClassDecl() :
 }
 {
     <CLASS> tkn=<ID>{ ci = new Id(tkn.toString()); }
-    [ <EXTENDS> <ID>{ pi = new Id(tkn.toString()); } ]
+    [ <EXTENDS> tkn=<ID>{ pi = new Id(tkn.toString()); } ]
     <LBRACE> ( v = VarDecl() { avl.add(v); } )* 
     ( m = MethodDecl() { aml.add(m); })* <RBRACE>
     { return new ClassDecl(ci, pi, avl, aml); }
@@ -156,15 +156,16 @@ ClassDecl ClassDecl() :
 MethodDecl MethodDecl() :
 {
     Type at = null; Token tkn; Id i = null; 
-    FormalList afl = null; 
-    VarDecl v; VarDeclList avl = null;
-    Stmt s; StmtList asl = null;
+    FormalList afl = new FormalList(); 
+    VarDecl v; VarDeclList avl = new VarDeclList();
+    Stmt s; StmtList asl = new StmtList();
 }
 {
     <PUBLIC> ( (at = Type() | <VOID>) tkn=<ID>{ i = new Id(tkn.toString()); }
     <LPAREN> [afl = Formals()] <RPAREN> 
     |
-    <STATIC> <VOID> <MAIN> <LPAREN> <STRING> <LBRACKET> <RBRACKET> <ID>
+    <STATIC> <VOID> <MAIN> <LPAREN> <STRING> <LBRACKET> <RBRACKET> 
+    tkn=<ID>{ i = new Id("main"); }
     <RPAREN>)
     <LBRACE> ( LOOKAHEAD(2) v = VarDecl() { avl.add(v); } )* ( s = Statement() {
     asl.add(s); } )* <RBRACE>
@@ -230,11 +231,11 @@ Stmt Statement() :
 { 
     boolean isAssign = false; 
     Exp ex = null, ex2 = null; 
-    StmtList asl = null; 
+    StmtList asl = new StmtList(); 
     Stmt s1 = null, s2 = null; 
     StrVal sv = null;
-    ExpList a = null;
-    Token tkn;
+    ExpList a = new ExpList();
+    Token tkn = null;
 }
 {
     <LBRACE> ( s1 = Statement(){ asl.add(s1); } )* <RBRACE>
@@ -298,7 +299,7 @@ Exp InitExpr() :
     Type t = null; 
     Token tkn; 
     Exp ex; 
-    ExpList el = null;
+    ExpList el = new ExpList();
     boolean isArray = false; 
     int n = 0;
     Id i = null;
@@ -477,7 +478,7 @@ Exp Lvalue() :
         else
             i = new Id(tkn.toString());
     }
-    ( LOOKAHEAD(2) <PERIOD> <ID>
+    ( LOOKAHEAD(2) <PERIOD> tkn=<ID>
     { 
         if (f == null)
             f = new Field(i, new Id(tkn.toString()));
