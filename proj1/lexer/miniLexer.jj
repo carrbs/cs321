@@ -7,6 +7,9 @@
  * some of this code was designed by studying:
  * Javacc-5.0/examples/JavaCCGrammar/JavaCC.jj
  *
+ * I am adding this text here to excercise the 
+ * branch creation functionality of git.
+ *
  * ***************************/
 
 PARSER_BEGIN(miniLexer) 
